@@ -7,6 +7,7 @@ Penggunaan:
     python main.py --mode autonomous   # Navigasi otonom & obstacle avoidance (BEST 2026)
     python main.py --mode follow       # Interaktif mengikuti orang (Bazar PKKMB)
     python main.py --mode teleop       # Remote manual Gamepad Xbox via Pygame
+    python main.py --mode tiktok       # Siaran langsung TikTok Live Interactive Gift
     python main.py --mode telemetry    # Digital Twin WebSocket bridge server
     python main.py --mode test-cam     # Uji kamera & pipeline visi komputer
     python main.py --mode test-gui     # GUI manual slider uji servo & IMU
@@ -28,6 +29,7 @@ Pilihan Mode:
   autonomous   : Navigasi otonom kompetisi BEST (Canny + Flow + GroundSeg + PID Leveling)
   follow       : Mode interaksi mengikuti orang (YOLOv8 + Hysteresis Tracking + Animations)
   teleop       : Kendali manual remote Gamepad Xbox (Pygame)
+  tiktok       : Interaktif siaran langsung TikTok Live (Gift -> Animasi Robot)
   telemetry    : Digital Twin bridge server (UDP -> WebSocket untuk browser 3D)
   test-cam     : Uji kamera & filter visi tanpa servo
   test-gui     : GUI slider Tkinter untuk uji gerak servo & orientasi IMU
@@ -43,12 +45,26 @@ Pilihan Mode:
             "autonomous", "auto",
             "follow", "person",
             "teleop", "gamepad",
+            "tiktok", "live",
             "telemetry", "bridge", "twin",
             "test-cam",
             "test-gui", "test-move",
             "test-level"
         ],
         help="Mode operasi atau modul uji yang ingin dijalankan (default: autonomous)"
+    )
+
+    parser.add_argument(
+        "--user",
+        type=str,
+        default="@wasakarobotic",
+        help="Username streamer TikTok (khusus mode tiktok/live)"
+    )
+
+    parser.add_argument(
+        "--test", "--mock",
+        action="store_true",
+        help="Mode simulasi/uji coba offline (khusus mode tiktok/live)"
     )
 
     args = parser.parse_args()
@@ -65,6 +81,10 @@ Pilihan Mode:
     elif mode in ("teleop", "gamepad"):
         from apps.teleop.gamepad import run_teleop
         run_teleop()
+
+    elif mode in ("tiktok", "live"):
+        from apps.tiktok_live.main import run_tiktok_live
+        run_tiktok_live(username=args.user, test_mode=args.test)
 
     elif mode in ("telemetry", "bridge", "twin"):
         from apps.telemetry.bridge import run_bridge
