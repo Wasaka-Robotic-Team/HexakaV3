@@ -1,0 +1,30 @@
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Virtual Environment
+venv/
+env/
+.venv/
+
+# Logs & Sesi
+logs/
+*.csv
+*.log
+
+# System & OS Files
+.DS_Store
+Thumbs.db
+*.tmp
+
+# Temporary Binary / Installers
+*.sh
+
+# IDE Configuration
+.vscode/
+.idea/
+.claude/
+*.swp

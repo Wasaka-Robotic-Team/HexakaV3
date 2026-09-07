@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Wasaka Hexapod - Digital Twin</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #060a10;
+    color: #d4d0bc;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ---- Header ---- */
+  #header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 20px;
+    background: #0d1520;
+    border-bottom: 2px solid #1e3448;
+    flex-shrink: 0;
+  }
+  #header-title {
+    font-size: 18px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: #d8c83a;
+  }
+  #header-sub { font-size: 11px; color: #8a9aaa; margin-top: 2px; }
+  #conn-badge {
+    padding: 4px 14px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    background: #220a0a;
+    color: #ff4444;
+    border: 1px solid #441010;
+    transition: all 0.3s;
+  }
+  #conn-badge.connected {
+    background: #082208;
+    color: #44ff66;
+    border-color: #104410;
+  }
+
+  /* ---- Main layout ---- */
+  #main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  #viewport {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+  #viewport canvas { display: block; }
+
+  /* ---- Side panel ---- */
+  #panel {
+    width: 310px;
+    background: #0a1018;
+    border-left: 1px solid #1a2834;
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    gap: 8px;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+
+  .card {
+    background: #0e1824;
+    border: 1px solid #1e3040;
+    border-radius: 6px;
+    padding: 10px 12px;
+  }
+  .card-title {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #8090a0;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #1e3040;
+    padding-bottom: 4px;
+  }
+
+  /* Attitude indicator canvas */
+  #horizon-canvas {
+    display: block;
+    margin: 0 auto;
+    border-radius: 50%;
+    border: 2px solid #2a4060;
+  }
+
+  /* Roll arc below horizon */
+  #roll-arc { display: block; margin: 4px auto 0; }
+
+  /* Euler readouts */
+  .euler-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid #131e28;
+  }
+  .euler-row:last-child { border-bottom: none; }
+  .euler-label { font-size: 11px; color: #7890a8; width: 48px; }
+  .euler-bar-wrap { flex: 1; height: 6px; background: #0a1420; border-radius: 3px; margin: 0 8px; overflow: hidden; }
+  .euler-bar { height: 100%; border-radius: 3px; transition: width 0.08s; }
+  .euler-val {
+    font-size: 15px;
+    font-weight: bold;
+    width: 72px;
+    text-align: right;
+    color: #e8e0c0;
+  }
+  .euler-val.warn { color: #ffa040; }
+  .euler-val.alert { color: #ff4444; }
+
+  /* Calibration */
+  .calib-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+  }
+  .calib-label { font-size: 11px; color: #7890a8; width: 34px; }
+  .calib-pips { display: flex; gap: 3px; }
+  .pip {
+    width: 18px; height: 10px; border-radius: 2px;
+    background: #0a1420;
+    border: 1px solid #1e3040;
+    transition: background 0.3s;
+  }
+  .pip.on { background: #22cc66; border-color: #1a9944; }
+  .pip.warn { background: #cc8822; border-color: #996600; }
+  .calib-num { font-size: 12px; color: #90a8b8; margin-left: 4px; }
+
+  /* Axis flip controls */
+  .flip-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .flip-btn {
+    padding: 4px 10px;
+    font-size: 10px;
+    font-family: 'Courier New', monospace;
+    background: #0e1824;
+    color: #8090a8;
+    border: 1px solid #1e3040;
+    border-radius: 3px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+  }
+  .flip-btn.active { background: #1a3050; color: #60aaff; border-color: #2a5080; }
+
+  /* WS URL input */
+  #ws-row { display: flex; gap: 6px; align-items: center; }
+  #ws-input {
+    flex: 1;
+    background: #0a1420;
+    color: #b0c8e0;
+    border: 1px solid #1e3040;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+  }
+  #ws-btn {
+    padding: 4px 12px;
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+    background: #1a2a40;
+    color: #60aaff;
+    border: 1px solid #2a5080;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  #ws-btn:hover { background: #2a3a50; }
+
+  /* Latency + seq */
+  #stats-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #5a7090;
+    margin-top: 4px;
+  }
+  #lat-val { color: #44cc88; }
+  #lat-val.slow { color: #ffa040; }
+
+  /* Help overlay */
+  #help {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    font-size: 10px;
+    color: #3a5070;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<!-- ======== HEADER ======== -->
+<div id="header">
+  <div>
+    <div id="header-title">WASAKA HEXAPOD * DIGITAL TWIN</div>
+    <div id="header-sub">Real-time Orientation | BNO055 IMU | Three.js WebGL</div>
+  </div>
+  <div id="conn-badge">[x] DISCONNECTED</div>
+</div>
+
+<!-- ======== MAIN ======== -->
+<div id="main">
+
+  <!-- Three.js viewport -->
+  <div id="viewport">
+    <div id="help">Drag to orbit &nbsp;|&nbsp; Scroll to zoom</div>
+  </div>
+
+  <!-- Right panel -->
+  <div id="panel">
+
+    <!-- Connection -->
+    <div class="card">
+      <div class="card-title">CONNECTION</div>
+      <div id="ws-row">
+        <input id="ws-input" type="text" value="ws://localhost:8765" spellcheck="false">
+        <button id="ws-btn" onclick="reconnect()">Connect</button>
+      </div>
+      <div id="stats-row">
+        <span>Latency: <span id="lat-val">--</span></span>
+        <span id="seq-val">seq: --</span>
+      </div>
+    </div>
+
+    <!-- Attitude Indicator (Artificial Horizon) -->
+    <div class="card" style="text-align:center;">
+      <div class="card-title">ATTITUDE INDICATOR</div>
+      <canvas id="horizon-canvas" width="240" height="240"></canvas>
+      <canvas id="roll-arc" width="240" height="50"></canvas>
+    </div>
+
+    <!-- Euler angles -->
+    <div class="card">
+      <div class="card-title">ORIENTATION (EULER)</div>
+      <div class="euler-row">
+        <span class="euler-label">ROLL</span>
+        <div class="euler-bar-wrap">
+          <div class="euler-bar" id="bar-roll" style="background:#2288ff;width:50%;"></div>
+        </div>
+        <span class="euler-val" id="val-roll">+0.0 deg</span>
+      </div>
+      <div class="euler-row">
+        <span class="euler-label">PITCH</span>
+        <div class="euler-bar-wrap">
+          <div class="euler-bar" id="bar-pitch" style="background:#22cc88;width:50%;"></div>
+        </div>
+        <span class="euler-val" id="val-pitch">+0.0 deg</span>
+      </div>
+      <div class="euler-row">
+        <span class="euler-label">YAW</span>
+        <div class="euler-bar-wrap">
+          <div class="euler-bar" id="bar-yaw" style="background:#cc8822;width:50%;"></div>
+        </div>
+        <span class="euler-val" id="val-yaw">+0.0 deg</span>
+      </div>
+    </div>
+
+    <!-- Calibration -->
+    <div class="card">
+      <div class="card-title">KALIBRASI IMU</div>
+      <div class="calib-row">
+        <span class="calib-label">SYS</span>
+        <div class="calib-pips" id="pips-sys"></div>
+        <span class="calib-num" id="num-sys">0/3</span>
+      </div>
+      <div class="calib-row">
+        <span class="calib-label">GYRO</span>
+        <div class="calib-pips" id="pips-gyro"></div>
+        <span class="calib-num" id="num-gyro">0/3</span>
+      </div>
+      <div class="calib-row">
+        <span class="calib-label">ACC</span>
+        <div class="calib-pips" id="pips-acc"></div>
+        <span class="calib-num" id="num-acc">0/3</span>
+      </div>
+      <div class="calib-row">
+        <span class="calib-label">MAG</span>
+        <div class="calib-pips" id="pips-mag"></div>
+        <span class="calib-num" id="num-mag">0/3</span>
+      </div>
+    </div>
+
+    <!-- Axis correction -->
+    <div class="card">
+      <div class="card-title">KOREKSI SUMBU (jika terbalik)</div>
+      <div class="flip-row">
+        <button class="flip-btn" id="flip-roll"  onclick="toggleFlip('roll')">Flip ROLL</button>
+        <button class="flip-btn" id="flip-pitch" onclick="toggleFlip('pitch')">Flip PITCH</button>
+        <button class="flip-btn" id="flip-yaw"   onclick="toggleFlip('yaw')">Flip YAW</button>
+      </div>
+      <div class="flip-row" style="margin-top:6px;">
+        <button class="flip-btn" id="use-quat" onclick="toggleQuat()" title="Pakai quaternion jika tersedia (lebih halus)">Quat Mode: OFF</button>
+        <button class="flip-btn" onclick="resetView()">Reset View</button>
+      </div>
+    </div>
+
+  </div><!-- end #panel -->
+</div><!-- end #main -->
+
+<!-- ======================================================
+     SCRIPTS
+     ====================================================== -->
+<script type="importmap">
+{
+  "imports": {
+    "three":            "https://unpkg.com/three@0.158.0/build/three.module.js",
+    "three/addons/":    "https://unpkg.com/three@0.158.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ============================================================
+// GLOBAL STATE
+// ============================================================
+let roll = 0, pitch = 0, yaw = 0, calib = [0,0,0,0];
+let quatData = null;
+let useQuat = false;
+const flip = { roll: 1, pitch: 1, yaw: 1 };
+
+// ============================================================
+// THREE.JS SETUP
+// ============================================================
+const vp       = document.getElementById('viewport');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
+renderer.toneMapping       = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+vp.appendChild(renderer.domElement);
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
+camera.position.set(0, 9, 14);
+camera.lookAt(0, 0, 0);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0, 0);
+controls.minDistance = 5;
+controls.maxDistance = 40;
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.update();
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x060a10);
+scene.fog        = new THREE.Fog(0x060a10, 30, 60);
+
+// ---- Lighting ----
+const ambient = new THREE.AmbientLight(0x304060, 0.8);
+scene.add(ambient);
+
+const sun = new THREE.DirectionalLight(0xfff0d8, 1.5);
+sun.position.set(8, 14, 6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+scene.add(sun);
+
+const fill = new THREE.DirectionalLight(0x204060, 0.5);
+fill.position.set(-6, 4, -8);
+scene.add(fill);
+
+// ---- Ground grid ----
+const grid = new THREE.GridHelper(40, 40, 0x1a3048, 0x0e1e2c);
+grid.position.y = -3.2;
+scene.add(grid);
+
+// Ground plane (shadow receiver)
+const groundMesh = new THREE.Mesh(
+  new THREE.PlaneGeometry(40, 40),
+  new THREE.MeshLambertMaterial({ color: 0x06090e, transparent: true, opacity: 0.6 })
+);
+groundMesh.rotation.x = -Math.PI / 2;
+groundMesh.position.y = -3.21;
+groundMesh.receiveShadow = true;
+scene.add(groundMesh);
+
+// Small axes helper (bottom-left, via inset render) -- skip, use a corner indicator
+const axesHelper = new THREE.AxesHelper(2);
+scene.add(axesHelper);
+
+// ============================================================
+// HEXAPOD MODEL
+// ============================================================
+const bodyMat = new THREE.MeshPhongMaterial({
+  color: 0x1a3d6b, shininess: 90, specular: 0x336699
+});
+const legMat = new THREE.MeshPhongMaterial({
+  color: 0x1a3260, shininess: 50, specular: 0x224488
+});
+const jointMat = new THREE.MeshPhongMaterial({
+  color: 0x38a8cc, shininess: 120, specular: 0x60d0ff
+});
+const footMat = new THREE.MeshPhongMaterial({
+  color: 0xd8a820, shininess: 60
+});
+const accentMat = new THREE.MeshPhongMaterial({
+  color: 0xd8c83a, shininess: 200, specular: 0xffeeaa
+});
+
+// Hexapod group -- rotated by IMU data
+const hexGroup = new THREE.Group();
+scene.add(hexGroup);
+
+// --- Body ---
+const bodyMesh = new THREE.Mesh(
+  new THREE.BoxGeometry(5.0, 0.9, 2.6),
+  bodyMat
+);
+bodyMesh.castShadow = true;
+hexGroup.add(bodyMesh);
+
+// Rounded body edge fillets (thin boxes on sides)
+[0, 1].forEach(i => {
+  const fillet = new THREE.Mesh(
+    new THREE.BoxGeometry(4.6, 0.2, 0.1),
+    bodyMat
+  );
+  fillet.position.set(0, 0, (i === 0 ? -1.35 : 1.35));
+  hexGroup.add(fillet);
+});
+
+// Top sensor/IMU box
+const imuBox = new THREE.Mesh(
+  new THREE.BoxGeometry(0.9, 0.5, 0.7),
+  new THREE.MeshPhongMaterial({ color: 0x101820, shininess: 200, specular: 0x304050 })
+);
+imuBox.position.set(0.3, 0.7, 0);
+imuBox.castShadow = true;
+hexGroup.add(imuBox);
+
+// Accent stripe on body
+const stripe = new THREE.Mesh(
+  new THREE.BoxGeometry(4.6, 0.08, 0.14),
+  accentMat
+);
+stripe.position.set(0, 0.5, 0);
+hexGroup.add(stripe);
+
+// Forward indicator (small wedge on front)
+const nose = new THREE.Mesh(
+  new THREE.ConeGeometry(0.18, 0.5, 4),
+  accentMat
+);
+nose.rotation.z = -Math.PI / 2;
+nose.position.set(2.65, 0, 0);
+hexGroup.add(nose);
+
+// --- Legs ---
+// Mount angles follow locomotion.py convention:
+//   x = forward (+x = body front)
+//   z = lateral  (-z = left, +z = right)  [Three.js right-hand, y-up]
+// mount angle: cos(a)->+x, sin(a)->-z  (left is -z because locomotion y=left=Three.js -z)
+const LEG_DEFS = [
+  { angle:  45, name: 'L1_DepanKiri'     },
+  { angle:  90, name: 'L2_TengahKiri'    },
+  { angle: 135, name: 'L3_BelakangKiri'  },
+  { angle: -45, name: 'L4_DepanKanan'    },
+  { angle: -90, name: 'L5_TengahKanan'   },
+  { angle:-135, name: 'L6_BelakangKanan' },
+];
+
+function addCylinder(parent, from, to, radius, material) {
+  const dir = new THREE.Vector3().subVectors(to, from);
+  const len = dir.length();
+  if (len < 0.001) return;
+  const mid = new THREE.Vector3().addVectors(from, to).multiplyScalar(0.5);
+  const mesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius, radius, len, 10),
+    material
+  );
+  mesh.quaternion.setFromUnitVectors(
+    new THREE.Vector3(0, 1, 0),
+    dir.normalize()
+  );
+  mesh.position.copy(mid);
+  mesh.castShadow = true;
+  parent.add(mesh);
+}
+
+function addJoint(parent, pos, radius, material) {
+  const s = new THREE.Mesh(new THREE.SphereGeometry(radius, 10, 10), material);
+  s.position.copy(pos);
+  s.castShadow = true;
+  parent.add(s);
+}
+
+LEG_DEFS.forEach(({ angle }) => {
+  const rad = THREE.MathUtils.degToRad(angle);
+  // Mount point on body edge
+  const bx = Math.cos(rad) * 2.5;
+  const bz = -Math.sin(rad) * 1.3;
+  // Outward unit direction
+  const dx = Math.cos(rad), dz = -Math.sin(rad);
+
+  // Coxa: horizontal, extending outward from body
+  const coxaLen = 1.1;
+  const coxaEnd = new THREE.Vector3(bx + dx * coxaLen, 0, bz + dz * coxaLen);
+  addCylinder(hexGroup,
+    new THREE.Vector3(bx, 0, bz), coxaEnd, 0.09, legMat);
+  addJoint(hexGroup, coxaEnd, 0.13, jointMat);
+
+  // Femur: angled ~45 deg downward from coxa end
+  const femurLen = 1.35;
+  const fDir = new THREE.Vector3(dx * 0.55, -0.70, dz * 0.55).normalize();
+  const femurEnd = new THREE.Vector3().addVectors(
+    coxaEnd, fDir.clone().multiplyScalar(femurLen));
+  addCylinder(hexGroup, coxaEnd, femurEnd, 0.075, legMat);
+  addJoint(hexGroup, femurEnd, 0.11, jointMat);
+
+  // Tibia: mostly downward, slight outward
+  const tibiaLen = 1.85;
+  const tDir = new THREE.Vector3(dx * 0.20, -0.98, dz * 0.20).normalize();
+  const tibiaEnd = new THREE.Vector3().addVectors(
+    femurEnd, tDir.clone().multiplyScalar(tibiaLen));
+  addCylinder(hexGroup, femurEnd, tibiaEnd, 0.06, legMat);
+
+  // Foot
+  addJoint(hexGroup, tibiaEnd, 0.10, footMat);
+});
+
+// Center hexGroup so feet rest near y=0 of hexGroup -> lift group up
+hexGroup.position.y = 0;   // feet are at ~y=-3.2 of group -> match grid
+
+// ============================================================
+// WINDOW RESIZE
+// ============================================================
+function onResize() {
+  const w = vp.clientWidth, h = vp.clientHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', onResize);
+onResize();
+
+// ============================================================
+// IMU DATA -> ROTATION
+// ============================================================
+const _euler = new THREE.Euler(0, 0, 0, 'YXZ');
+const _quat  = new THREE.Quaternion();
+
+function applyOrientation() {
+  if (useQuat && quatData) {
+    // BNO055 quaternion: (w, x, y, z) in sensor frame.
+    // BNO055 sensor frame (NDOF): x=North/forward, y=West/left, z=Up.
+    // Three.js frame: x=right, y=up, z=toward-viewer; body facing +x.
+    // Remap: (w_bno, x_bno, y_bno, z_bno) -> Three.js (x,y,z,w):
+    //   body-x(forward) = Three.js -z axis
+    //   body-y(left)    = Three.js -x axis
+    //   body-z(up)      = Three.js  y axis
+    // Simple remap: qx_three = -qy_bno, qy_three = qz_bno, qz_three = -qx_bno
+    const [qw, qx, qy, qz] = quatData;
+    _quat.set(-qy * flip.roll, qz * flip.pitch, -qx * flip.yaw, qw);
+    _quat.normalize();
+    hexGroup.quaternion.copy(_quat);
+  } else {
+    // Euler fallback.
+    // roll  = rotation about body's forward (+x) axis -> Three.js rotation.z
+    // pitch = rotation about body's lateral (+z) axis -> Three.js rotation.x
+    // yaw   = rotation about body's up (+y) axis      -> Three.js rotation.y
+    _euler.set(
+      THREE.MathUtils.degToRad(pitch * flip.pitch),   // x: pitch (nose up/down)
+      THREE.MathUtils.degToRad(-yaw * flip.yaw),      // y: heading (negate CW->CCW)
+      THREE.MathUtils.degToRad(roll  * flip.roll)     // z: bank (left-right)
+    );
+    hexGroup.rotation.copy(_euler);
+  }
+}
+
+// ============================================================
+// ANIMATION LOOP
+// ============================================================
+let lastData = Date.now();
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  // Fade model if no data for >2s (connection lost)
+  const stale = (Date.now() - lastData) > 2000;
+  bodyMat.opacity = stale ? 0.35 : 1.0;
+  bodyMat.transparent = stale;
+  legMat.opacity  = stale ? 0.35 : 1.0;
+  legMat.transparent = stale;
+
+  controls.update();
+  applyOrientation();
+  renderer.render(scene, camera);
+
+  // Artificial horizon
+  drawHorizon();
+  drawRollArc();
+}
+animate();
+
+// ============================================================
+// ARTIFICIAL HORIZON (2D canvas)
+// ============================================================
+const hCanvas = document.getElementById('horizon-canvas');
+const hCtx    = hCanvas.getContext('2d');
+const rCanvas = document.getElementById('roll-arc');
+const rCtx    = rCanvas.getContext('2d');
+
+function drawHorizon() {
+  const W = hCanvas.width, H = hCanvas.height;
+  const cx = W / 2, cy = H / 2, r = Math.min(W, H) / 2 - 4;
+  const rollRad  = THREE.MathUtils.degToRad(roll  * flip.roll);
+  const pitchDeg = pitch * flip.pitch;
+  const pxPerDeg = r / 40; // +/-40 deg full scale
+
+  hCtx.clearRect(0, 0, W, H);
+  hCtx.save();
+
+  // Clip circle
+  hCtx.beginPath();
+  hCtx.arc(cx, cy, r, 0, Math.PI * 2);
+  hCtx.clip();
+
+  // Rotate canvas for roll
+  hCtx.translate(cx, cy);
+  hCtx.rotate(-rollRad);
+
+  const py = pitchDeg * pxPerDeg; // positive pitch -> horizon moves down
+
+  // Sky
+  const skyGrad = hCtx.createLinearGradient(0, -r, 0, py);
+  skyGrad.addColorStop(0, '#0a1a40');
+  skyGrad.addColorStop(1, '#1a4080');
+  hCtx.fillStyle = skyGrad;
+  hCtx.fillRect(-r, -r, r * 2, r + py);
+
+  // Ground
+  const gndGrad = hCtx.createLinearGradient(0, py, 0, r);
+  gndGrad.addColorStop(0, '#3a1a08');
+  gndGrad.addColorStop(1, '#1a0a04');
+  hCtx.fillStyle = gndGrad;
+  hCtx.fillRect(-r, py, r * 2, r);
+
+  // Horizon line
+  hCtx.strokeStyle = '#ff9922';
+  hCtx.lineWidth = 2.5;
+  hCtx.beginPath();
+  hCtx.moveTo(-r, py);
+  hCtx.lineTo(r, py);
+  hCtx.stroke();
+
+  // Pitch graduation lines
+  for (let p = -30; p <= 30; p += 5) {
+    if (p === 0) continue;
+    const ly = py - p * pxPerDeg;
+    if (Math.abs(ly) > r * 0.96) continue;
+    const lw = (p % 10 === 0) ? r * 0.44 : r * 0.26;
+    hCtx.strokeStyle = 'rgba(200,210,220,0.55)';
+    hCtx.lineWidth = (p % 10 === 0) ? 1.5 : 1;
+    hCtx.beginPath();
+    hCtx.moveTo(-lw / 2, ly);
+    hCtx.lineTo(lw / 2, ly);
+    hCtx.stroke();
+    if (p % 10 === 0) {
+      hCtx.fillStyle = 'rgba(180,200,220,0.75)';
+      hCtx.font = '11px monospace';
+      hCtx.fillText((p > 0 ? '+' : '') + p, lw / 2 + 5, ly + 4);
+    }
+  }
+
+  hCtx.restore();
+
+  // Fixed crosshair (not rotating)
+  hCtx.strokeStyle = '#ffcc00';
+  hCtx.lineWidth = 3;
+  hCtx.beginPath();
+  hCtx.moveTo(cx - 28, cy); hCtx.lineTo(cx - 7, cy);
+  hCtx.moveTo(cx + 7, cy);  hCtx.lineTo(cx + 28, cy);
+  hCtx.moveTo(cx, cy - 5);  hCtx.lineTo(cx, cy - 16);
+  hCtx.stroke();
+  hCtx.fillStyle = '#ffcc00';
+  hCtx.beginPath();
+  hCtx.arc(cx, cy, 3, 0, Math.PI * 2);
+  hCtx.fill();
+
+  // Border
+  hCtx.beginPath();
+  hCtx.arc(cx, cy, r, 0, Math.PI * 2);
+  hCtx.strokeStyle = '#2a4060';
+  hCtx.lineWidth = 3;
+  hCtx.stroke();
+}
+
+function drawRollArc() {
+  const W = rCanvas.width, H = rCanvas.height;
+  const cx = W / 2, cy = H - 4;
+  const R = cx - 10;
+  const rollRad = THREE.MathUtils.degToRad(roll * flip.roll);
+
+  rCtx.clearRect(0, 0, W, H);
+
+  // Arc background
+  rCtx.beginPath();
+  rCtx.arc(cx, cy, R, Math.PI, 0, false);
+  rCtx.strokeStyle = '#1a2c3e';
+  rCtx.lineWidth = 8;
+  rCtx.stroke();
+
+  // Tick marks every 10 deg
+  for (let d = -80; d <= 80; d += 10) {
+    const a = Math.PI - THREE.MathUtils.degToRad(d + 90);
+    const inner = (d % 30 === 0) ? R - 14 : R - 9;
+    rCtx.beginPath();
+    rCtx.moveTo(cx + R * Math.cos(a), cy + R * Math.sin(a));
+    rCtx.lineTo(cx + inner * Math.cos(a), cy + inner * Math.sin(a));
+    rCtx.strokeStyle = (d % 30 === 0) ? '#4a6a80' : '#2a4050';
+    rCtx.lineWidth = (d % 30 === 0) ? 2 : 1;
+    rCtx.stroke();
+  }
+
+  // Roll pointer
+  const pAngle = Math.PI * 1.5 - rollRad;
+  const px = cx + (R - 4) * Math.cos(pAngle);
+  const py = cy + (R - 4) * Math.sin(pAngle);
+  const col = Math.abs(roll) > 20 ? '#ff4040' : (Math.abs(roll) > 10 ? '#ffa040' : '#ffcc00');
+  rCtx.beginPath();
+  rCtx.arc(px, py, 6, 0, Math.PI * 2);
+  rCtx.fillStyle = col;
+  rCtx.fill();
+
+  // Roll value
+  rCtx.fillStyle = col;
+  rCtx.font = 'bold 12px monospace';
+  rCtx.textAlign = 'center';
+  rCtx.fillText((roll * flip.roll >= 0 ? '+' : '') + (roll * flip.roll).toFixed(1) + ' deg', cx, cy - 8);
+}
+
+// ============================================================
+// UI UPDATES
+// ============================================================
+function updateEuler(r, p, y) {
+  const formatVal = v => (v >= 0 ? '+' : '') + v.toFixed(1) + ' deg';
+  const barPct = v => (50 + Math.max(-50, Math.min(50, v * 50 / 90))) + '%';
+  const warnColor = v => Math.abs(v) > 30 ? 'alert' : (Math.abs(v) > 15 ? 'warn' : '');
+
+  const rv = r * flip.roll, pv = p * flip.pitch, yv = y * flip.yaw;
+  document.getElementById('val-roll').textContent  = formatVal(rv);
+  document.getElementById('val-pitch').textContent = formatVal(pv);
+  document.getElementById('val-yaw').textContent   = formatVal(yv);
+  document.getElementById('val-roll').className  = 'euler-val ' + warnColor(rv);
+  document.getElementById('val-pitch').className = 'euler-val ' + warnColor(pv);
+
+  document.getElementById('bar-roll').style.width  = barPct(rv);
+  document.getElementById('bar-pitch').style.width = barPct(pv);
+  document.getElementById('bar-yaw').style.width   = (yv / 360 * 100 + 50) + '%';
+}
+
+function buildPips(id, val, numId) {
+  const el = document.getElementById(id);
+  el.innerHTML = '';
+  for (let i = 0; i < 3; i++) {
+    const pip = document.createElement('div');
+    pip.className = 'pip' + (i < val ? (val === 3 ? ' on' : ' warn') : '');
+    el.appendChild(pip);
+  }
+  document.getElementById(numId).textContent = val + '/3';
+  document.getElementById(numId).style.color = val === 3 ? '#22cc66' : (val > 0 ? '#cc8822' : '#555');
+}
+
+function updateCalib(c) {
+  buildPips('pips-sys',  c[0], 'num-sys');
+  buildPips('pips-gyro', c[1], 'num-gyro');
+  buildPips('pips-acc',  c[2], 'num-acc');
+  buildPips('pips-mag',  c[3], 'num-mag');
+}
+
+// Init calibration display
+updateCalib([0, 0, 0, 0]);
+
+// ============================================================
+// WEBSOCKET
+// ============================================================
+let ws = null;
+
+function reconnect() {
+  if (ws) { try { ws.close(); } catch(e) {} }
+  const url = document.getElementById('ws-input').value.trim();
+  connect(url);
+}
+
+function connect(url) {
+  try {
+    ws = new WebSocket(url);
+  } catch(e) {
+    setConnStatus(false);
+    return;
+  }
+
+  ws.onopen = () => {
+    setConnStatus(true);
+    console.log('[WS] Connected');
+  };
+
+  ws.onclose = () => {
+    setConnStatus(false);
+    console.log('[WS] Disconnected, retry in 2s...');
+    setTimeout(() => connect(url), 2000);
+  };
+
+  ws.onerror = () => {};
+
+  ws.onmessage = (evt) => {
+    try {
+      const d = JSON.parse(evt.data);
+      roll  = d.roll  ?? 0;
+      pitch = d.pitch ?? 0;
+      yaw   = d.yaw   ?? 0;
+      calib = d.calib ?? [0,0,0,0];
+      quatData = d.quat ?? null;
+      lastData = Date.now();
+
+      // Latency
+      const lat = d._lat_ms ?? 0;
+      const latEl = document.getElementById('lat-val');
+      latEl.textContent = lat.toFixed(1) + ' ms';
+      latEl.className = lat > 50 ? 'slow' : '';
+
+      // Seq
+      document.getElementById('seq-val').textContent = 'seq: ' + (d.seq ?? '--');
+
+      updateEuler(roll, pitch, yaw);
+      updateCalib(calib);
+    } catch(e) {}
+  };
+}
+
+function setConnStatus(ok) {
+  const el = document.getElementById('conn-badge');
+  el.textContent = ok ? '[v] CONNECTED' : '[x] DISCONNECTED';
+  el.className   = ok ? 'connected' : '';
+}
+
+// Auto-connect on load
+connect('ws://localhost:8765');
+
+// ============================================================
+// AXIS FLIP CONTROLS
+// ============================================================
+window.toggleFlip = function(axis) {
+  flip[axis] *= -1;
+  const btn = document.getElementById('flip-' + axis);
+  btn.classList.toggle('active', flip[axis] === -1);
+};
+
+window.toggleQuat = function() {
+  useQuat = !useQuat;
+  const btn = document.getElementById('use-quat');
+  btn.textContent = 'Quat Mode: ' + (useQuat ? 'ON' : 'OFF');
+  btn.classList.toggle('active', useQuat);
+};
+
+window.resetView = function() {
+  camera.position.set(0, 9, 14);
+  camera.lookAt(0, 0, 0);
+  controls.target.set(0, 0, 0);
+  controls.update();
+};
+
+window.reconnect = reconnect;
+
+// ============================================================
+// KEYBOARD SHORTCUTS
+// ============================================================
+window.addEventListener('keydown', e => {
+  if (e.key === 'r') toggleFlip('roll');
+  if (e.key === 'p') toggleFlip('pitch');
+  if (e.key === 'y') toggleFlip('yaw');
+  if (e.key === 'q') toggleQuat();
+  if (e.key === 'v') resetView();
+});
+
+</script>
+</body>
+</html>

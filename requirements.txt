@@ -1,0 +1,24 @@
+# ============================================================
+# WASAKA HEXAPOD - PYTHON DEPENDENCIES
+# ============================================================
+
+# --- Core Computer Vision & Numeric Processing ---
+numpy>=1.22.0
+opencv-python>=4.6.0
+
+# --- AI Object Detection & Inference ---
+onnxruntime>=1.14.0       # Gunakan onnxruntime-gpu jika memakai CUDA/TensorRT di Jetson
+# ultralytics>=8.0.0      # Diperlukan jika ingin melatih/ekspor model dari .pt ke .onnx
+
+# --- Hardware Drivers (Hanya di Raspberry Pi / Jetson) ---
+# dynamixel-sdk>=3.7.31   # Driver serial servo Dynamixel AX-12A
+# adafruit-blinka>=8.0.0  # CircuitPython layer untuk Linux SBC
+# adafruit-circuitpython-bno055>=5.4.0   # Driver IMU 9-DOF BNO055 I2C
+# adafruit-circuitpython-ssd1306>=2.12.0 # Driver OLED SSD1306 128x64 I2C
+# pillow>=9.0.0           # Untuk render teks & logo pada OLED
+
+# --- Teleoperation (Gamepad Xbox) ---
+pygame>=2.1.0
+
+# --- Telemetry & Digital Twin (Laptop Bridge) ---
+websockets>=11.0.0
