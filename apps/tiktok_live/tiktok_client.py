@@ -23,10 +23,21 @@ from .config import (
 )
 
 try:
-    from TikTokLive import TikTokLiveClient
-    from TikTokLive.types.events import GiftEvent, LikeEvent, FollowEvent, CommentEvent
+    # Newer versions may expose client and events under subpackages.
+    try:
+        from TikTokLive import TikTokLiveClient
+    except Exception:
+        from TikTokLive.client import TikTokLiveClient
+
+    try:
+        # Older layouts used `types.events`
+        from TikTokLive.types.events import GiftEvent, LikeEvent, FollowEvent, CommentEvent
+    except Exception:
+        # Fallback to `events` module present in some distributions
+        from TikTokLive.events import GiftEvent, LikeEvent, FollowEvent, CommentEvent
+
     HAS_TIKTOK_LIB = True
-except ImportError:
+except Exception:
     HAS_TIKTOK_LIB = False
     TikTokLiveClient = None
     GiftEvent = None

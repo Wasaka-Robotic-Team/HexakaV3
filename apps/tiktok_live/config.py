@@ -10,7 +10,7 @@ AUTHOR: Wasaka Robotic Team
 """
 
 # Akun TikTok streamer default (bisa di-override lewat argumen CLI --user)
-DEFAULT_TIKTOK_USERNAME = "@wasakarobotic"
+DEFAULT_TIKTOK_USERNAME = "@el.nopale"
 
 # ============================================================
 # PEMETAAN GIFT TIKTOK -> ANIMASI ROBOT

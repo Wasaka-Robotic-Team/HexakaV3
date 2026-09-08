@@ -196,3 +196,46 @@ class OledDisplay:
             self.disp.show()
         except Exception:
             pass
+
+
+class OledWorker:
+    """Simple background worker placeholder for OLED display.
+
+    Provides a minimal `start()` / `stop()` API so application modules can
+    import and control an OLED worker without requiring a complex
+    implementation. The worker runs a lightweight thread (daemon) that
+    idles until stopped. This is intentionally minimal: apps currently only
+    call `OledWorker(oled).start()` and later `stop()`.
+    """
+
+    def __init__(self, oled: OledDisplay, interval: float = 0.2):
+        self.oled = oled
+        self.interval = float(interval)
+        self._stop_event = __import__('threading').Event()
+        self._thread = __import__('threading').Thread(target=self._run, daemon=True)
+
+    def start(self):
+        try:
+            if not getattr(self.oled, "ok", False):
+                return self
+            if not self._thread.is_alive():
+                self._thread.start()
+        except Exception:
+            pass
+        return self
+
+    def _run(self):
+        while not self._stop_event.is_set():
+            # Idle loop; concrete updates may be pushed directly to `oled`.
+            try:
+                self._stop_event.wait(self.interval)
+            except Exception:
+                break
+
+    def stop(self):
+        try:
+            self._stop_event.set()
+            if self._thread.is_alive():
+                self._thread.join(timeout=0.5)
+        except Exception:
+            pass

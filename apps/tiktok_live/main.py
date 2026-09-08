@@ -95,7 +95,15 @@ def run_tiktok_live(username=DEFAULT_TIKTOK_USERNAME, test_mode=False):
                 mock_trigger = MockTriggerKeyboard(queue_mgr, on_quit_callback=stop_callback)
                 mock_trigger.start()
         else:
-            print("[INFO] Beralih otomatis ke mode simulator keyboard (--test).")
+            print("\n" + "=" * 60)
+            print("[WARN] Library 'TikTokLive' belum terpasang di Python robot:")
+            err_detail = getattr(listener, 'import_error', None)
+            if err_detail:
+                print(f"       Info: {err_detail}")
+            print("Agar bisa tersambung ke TikTok Live asli, jalankan di terminal:")
+            print("       pip install TikTokLive")
+            print("[INFO] Beralih sementara ke mode simulator keyboard (--test).")
+            print("=" * 60 + "\n")
             mock_trigger = MockTriggerKeyboard(queue_mgr, on_quit_callback=stop_callback)
             mock_trigger.start()
 
